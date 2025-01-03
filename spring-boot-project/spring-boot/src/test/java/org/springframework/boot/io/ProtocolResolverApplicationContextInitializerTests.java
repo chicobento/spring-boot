@@ -40,8 +40,11 @@ class ProtocolResolverApplicationContextInitializerTests {
 			ProtocolResolverApplicationContextInitializer initializer = new ProtocolResolverApplicationContextInitializer();
 			initializer.initialize(context);
 			assertThat(context).isInstanceOf(DefaultResourceLoader.class);
-			Collection<ProtocolResolver> protocolResolvers = ((DefaultResourceLoader) context).getProtocolResolvers();
-			assertThat(protocolResolvers).hasExactlyElementsOfTypes(Base64ProtocolResolver.class);
+			Collection<ProtocolResolver>
+
+			protocolResolvers = ((DefaultResourceLoader) context).getProtocolResolvers();
+			assertThat(protocolResolvers).hasExactlyElementsOfTypes(Base64ProtocolResolver.class,
+					EnvironmentVariableProtocolResolver.class);
 		}
 	}
 

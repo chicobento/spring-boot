@@ -20,8 +20,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -75,10 +77,10 @@ import static org.assertj.core.api.Assertions.assertThatNoException;
  */
 class ConfigDataEnvironmentPostProcessorIntegrationTests {
 
-	private SpringApplication application;
-
 	@TempDir
 	public File temp;
+
+	private SpringApplication application;
 
 	@BeforeEach
 	void setup() {
@@ -612,13 +614,70 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 		assertThat(context.getEnvironment().getProperty("my.value")).isEqualTo("iwasimported");
 	}
 
-	@Test // gh-26858
+	@Test
+	// gh-26858
 	void runWhenImportWithProfileVariantOrdersPropertySourcesCorrectly() {
 		this.application.setAdditionalProfiles("dev");
 		ConfigurableApplicationContext context = this.application
 			.run("--spring.config.location=classpath:application-import-with-profile-variant.properties");
 		assertThat(context.getEnvironment().getProperty("my.value"))
 			.isEqualTo("application-import-with-profile-variant-imported-dev");
+	}
+
+	@Test
+	void runWhenImportYamlFromEnvironmentVariable() throws Exception {
+		ConfigurableApplicationContext context = uk.org.webcompere.systemstubs.SystemStubs
+			.withEnvironmentVariable("MY_CONFIG_YAML", """
+					my:
+					  value: from-env-first-doc
+					---
+					my:
+					  value: from-env-second-doc
+					""")
+			.execute(() -> this.application
+				.run("--spring.config.location=classpath:application-import-yaml-from-environment.properties"));
+		assertThat(context.getEnvironment().getProperty("my.value")).isEqualTo("from-env-second-doc");
+	}
+
+	@Test
+	void runWhenImportYamlFromEnvironmentVariableWithProfileVariant() throws Exception {
+		this.application.setAdditionalProfiles("dev");
+		ConfigurableApplicationContext context = uk.org.webcompere.systemstubs.SystemStubs
+			.withEnvironmentVariables("MY_CONFIG_YAML", """
+					my:
+					  value: my_config_yaml
+					""", "MY_CONFIG_YAML_DEV", """
+					my:
+					  value: my_config_yaml_dev
+					""")
+			.execute(() -> this.application.run(
+					"--spring.config.location=classpath:application-import-yaml-from-environment-with-profile-variant.properties"));
+		assertThat(context.getEnvironment().getProperty("my.value")).isEqualTo("my_config_yaml_dev");
+	}
+
+	@Test
+	void runWhenImportBase64YamlFromEnvironmentVariable() throws Exception {
+		ConfigurableApplicationContext context = uk.org.webcompere.systemstubs.SystemStubs
+			.withEnvironmentVariable("MY_CONFIG_BASE64_YAML", Base64.getEncoder().encodeToString("""
+					my:
+					  value: from-base64-yaml
+					""".getBytes(StandardCharsets.UTF_8)))
+			.execute(() -> this.application
+				.run("--spring.config.location=classpath:application-import-base64-yaml-from-environment.properties"));
+		assertThat(context.getEnvironment().getProperty("my.value")).isEqualTo("from-base64-yaml");
+	}
+
+	@Test
+	void runWhenImportPropertiesFromEnvironmentVariable() throws Exception {
+		ConfigurableApplicationContext context = uk.org.webcompere.systemstubs.SystemStubs
+			.withEnvironmentVariable("MY_CONFIG_PROPERTIES", """
+					my.value1: from-properties-1
+					my.value2: from-properties-2
+					""")
+			.execute(() -> this.application
+				.run("--spring.config.location=classpath:application-import-properties-from-environment.properties"));
+		assertThat(context.getEnvironment().getProperty("my.value1")).isEqualTo("from-properties-1");
+		assertThat(context.getEnvironment().getProperty("my.value2")).isEqualTo("from-properties-2");
 	}
 
 	@Test
@@ -637,14 +696,16 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 			.withCauseInstanceOf(InactiveConfigDataAccessException.class);
 	}
 
-	@Test // gh-29386
+	@Test
+	// gh-29386
 	void runWhenHasPropertyInEarlierProfileDocumentThrowsException() {
 		assertThatExceptionOfType(BindException.class).isThrownBy(() -> this.application.run(
 				"--spring.config.location=classpath:application-import-with-placeholder-in-earlier-profile-document.properties"))
 			.withCauseInstanceOf(InactiveConfigDataAccessException.class);
 	}
 
-	@Test // gh-29386
+	@Test
+	// gh-29386
 	void runWhenHasPropertyInEarlierDocumentLoads() {
 		ConfigurableApplicationContext context = this.application.run(
 				"--spring.config.location=classpath:application-import-with-placeholder-in-earlier-document.properties");
@@ -769,7 +830,8 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 			.run("--spring.config.location=optional:file:src/test/resources/config/0-empty/*/"));
 	}
 
-	@Test // gh-24990
+	@Test
+	// gh-24990
 	void runWhenHasProfileSpecificFileWithActiveOnProfileProperty() {
 		ConfigurableApplicationContext context = this.application
 			.run("--spring.config.name=application-activate-on-profile-in-profile-specific-file");
@@ -778,7 +840,8 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 		assertThat(environment.getProperty("test2")).isEqualTo("test2");
 	}
 
-	@Test // gh-26960
+	@Test
+	// gh-26960
 	void runWhenHasProfileSpecificImportWithImportImportsSecondProfileSpecificFile() {
 		ConfigurableApplicationContext context = this.application
 			.run("--spring.config.name=application-profile-specific-import-with-import");
@@ -791,7 +854,8 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 		assertThat(environment.containsProperty("application-profile-specific-import-with-import-import-p2")).isTrue();
 	}
 
-	@Test // gh-26960
+	@Test
+	// gh-26960
 	void runWhenHasProfileSpecificImportWithCustomImportResolvesProfileSpecific() {
 		ConfigurableApplicationContext context = this.application
 			.run("--spring.config.name=application-profile-specific-import-with-custom-import");
@@ -800,7 +864,8 @@ class ConfigDataEnvironmentPostProcessorIntegrationTests {
 		assertThat(environment.containsProperty("test:boot:ps")).isTrue();
 	}
 
-	@Test // gh-26593
+	@Test
+	// gh-26593
 	void runWhenHasFilesInRootAndConfigWithProfiles() {
 		ConfigurableApplicationContext context = this.application
 			.run("--spring.config.name=file-in-root-and-config-with-profile", "--spring.profiles.active=p1,p2");
